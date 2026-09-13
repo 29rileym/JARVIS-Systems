@@ -1,0 +1,34 @@
+# ---------------------------------------------------------------------------
+# SECRETS — never commit. Each app reads a config.json next to main.py holding
+# API keys, the Home Assistant token, and FaceDoor's door passcode.
+# Copy the config.example.json in each folder instead.
+# ---------------------------------------------------------------------------
+config.json
+
+# ---------------------------------------------------------------------------
+# BIOMETRIC DATA — enrollment photos and 128-d face encodings that open a real
+# door. Re-enroll locally: python register_face.py "Name" photo.jpg
+# ---------------------------------------------------------------------------
+faces/
+
+# Private setup notes — personal email, server paths, token details. Local only.
+PUBLISHING.md
+
+# TLS keypairs — private keys. Both apps regenerate them automatically.
+*.pem
+
+# Python environments and bytecode
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+
+# Generated at runtime, rebuilt on demand
+tts_cache/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

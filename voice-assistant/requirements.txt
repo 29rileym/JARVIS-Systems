@@ -1,0 +1,6 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+google-genai>=1.16
+paho-mqtt>=2.0
+requests>=2.31
+cryptography>=42.0

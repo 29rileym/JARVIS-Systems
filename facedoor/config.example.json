@@ -1,0 +1,40 @@
+{
+  "ha_url": "http://192.168.1.50:8123",
+  "ha_token": "YOUR_HOME_ASSISTANT_LONG_LIVED_TOKEN",
+  "passcode": "0000",
+
+  "_comment_mqtt": "MQTT broker for the door lock. 'lock'/'unlock' are published to topic jarvis/door. Use just an IP (port defaults to 1883) or ip:port.",
+  "mqtt_broker": "192.168.1.50:1883",
+
+  "_comment": "THREE light states. entity_id must be the HA entity id (light.xxx), NOT the friendly name. To turn a bulb OFF use {\"state\":\"off\"}. For a solid color use rgb_color [R,G,B] 0-255 and brightness 0-255. effect must match the bulb's effect_list exactly. Optional: \"then\": {follow-up command} + \"then_after\": seconds schedules a second command for the same bulb.",
+
+  "_comment_scanning": "IDLE / waiting to scan: bulbs 1-3 OFF, bulb 4 runs the 'Blue pulse' DIY Govee scene. Govee DIY scenes are a select entity (the DIY Scene dropdown), so we turn the bulb on and then pick the option — the option text must match the dropdown EXACTLY (it is 'Blue pulse', lowercase p).",
+  "scanning_scene": [
+    { "entity_id": "light.smart_led_bulb_1", "state": "off" },
+    { "entity_id": "light.smart_led_bulb_2", "state": "off" },
+    { "entity_id": "light.smart_led_bulb_3", "state": "off" },
+    { "entity_id": "light.smart_led_bulb_4", "brightness": 200 },
+    { "entity_id": "select.smart_led_bulb_4_diy_scene", "option": "Blue pulse" }
+  ],
+
+  "_comment_accepted": "ACCESS GRANTED: bulbs 1-3 Starry Sky for 10s then warm orange (2700K); bulb 4 green for 5s then OFF.",
+  "accepted_scene": [
+    { "entity_id": "light.smart_led_bulb_1", "effect": "Starry Sky", "brightness": 220,
+      "then": { "color_temp_kelvin": 2700, "brightness": 255 }, "then_after": 10 },
+    { "entity_id": "light.smart_led_bulb_2", "effect": "Starry Sky", "brightness": 220,
+      "then": { "color_temp_kelvin": 2700, "brightness": 255 }, "then_after": 10 },
+    { "entity_id": "light.smart_led_bulb_3", "effect": "Starry Sky", "brightness": 220,
+      "then": { "color_temp_kelvin": 2700, "brightness": 255 }, "then_after": 10 },
+    { "entity_id": "light.smart_led_bulb_4", "rgb_color": [0, 255, 0], "brightness": 255,
+      "then": { "state": "off" }, "then_after": 5 }
+  ],
+
+  "_comment_denied": "ACCESS DENIED: bulbs 1-3 OFF; bulb 4 red for 5s then back to Blue pulse.",
+  "denied_scene": [
+    { "entity_id": "light.smart_led_bulb_1", "state": "off" },
+    { "entity_id": "light.smart_led_bulb_2", "state": "off" },
+    { "entity_id": "light.smart_led_bulb_3", "state": "off" },
+    { "entity_id": "light.smart_led_bulb_4", "rgb_color": [255, 0, 0], "brightness": 255,
+      "then": { "entity_id": "select.smart_led_bulb_4_diy_scene", "option": "Blue pulse" }, "then_after": 5 }
+  ]
+}

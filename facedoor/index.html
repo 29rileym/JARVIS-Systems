@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>J.A.R.V.I.S — FaceDoor</title>
+<style>
+  :root {
+    --bg: #04080f;
+    --panel: rgba(8, 20, 34, 0.72);
+    --cyan: #2de2ff;
+    --cyan-dim: #1893ad;
+    --blue: #0a84ff;
+    --green: #19ffb0;
+    --red: #ff3b54;
+    --text: #cdeaf5;
+    --grid: rgba(45, 226, 255, 0.07);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(10,132,255,0.12), transparent 60%),
+      linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 100% 36px,
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 36px 100%,
+      var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", "Rajdhani", system-ui, sans-serif;
+    min-height: 100%;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 24px 16px 48px;
+    letter-spacing: 0.04em;
+  }
+  header { text-align: center; margin-bottom: 18px; }
+  header h1 {
+    font-size: clamp(22px, 4vw, 36px);
+    font-weight: 700; letter-spacing: 0.5em;
+    color: var(--cyan);
+    text-shadow: 0 0 18px rgba(45,226,255,0.55);
+  }
+  header p { font-size: 12px; color: var(--cyan-dim); letter-spacing: 0.3em; margin-top: 6px; }
+
+  .stage {
+    position: relative;
+    width: min(680px, 96vw);
+    aspect-ratio: 4 / 3;
+    border: 1px solid rgba(45,226,255,0.35);
+    border-radius: 14px;
+    overflow: hidden;
+    background: #000;
+    box-shadow: 0 0 40px rgba(10,132,255,0.18), inset 0 0 60px rgba(0,0,0,0.6);
+  }
+  video, #overlay {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
+  video { transform: scaleX(-1); } /* mirror like a selfie */
+  #overlay { pointer-events: none; }
+
+  /* corner brackets */
+  .corner { position: absolute; width: 34px; height: 34px; border: 2px solid var(--cyan); opacity: 0.8; }
+  .corner.tl { top: 12px; left: 12px; border-right: 0; border-bottom: 0; }
+  .corner.tr { top: 12px; right: 12px; border-left: 0; border-bottom: 0; }
+  .corner.bl { bottom: 12px; left: 12px; border-right: 0; border-top: 0; }
+  .corner.br { bottom: 12px; right: 12px; border-left: 0; border-top: 0; }
+
+  /* scanning sweep line, shown only while a face is detected */
+  .scanline {
+    position: absolute; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    box-shadow: 0 0 16px 3px var(--cyan);
+    opacity: 0; animation: sweep 2.2s linear infinite;
+  }
+  .stage.scanning .scanline { opacity: 1; }
+  @keyframes sweep { 0% { top: 4%; } 50% { top: 94%; } 100% { top: 4%; } }
+
+  /* status banner */
+  .status {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    padding: 14px 18px; font-size: 14px; letter-spacing: 0.18em;
+    text-transform: uppercase; text-align: center;
+    background: linear-gradient(transparent, rgba(2,8,16,0.92));
+    color: var(--cyan);
+    transition: color 0.25s;
+  }
+  .status b { font-size: 20px; display: block; letter-spacing: 0.22em; }
+
+  /* full-stage tint overlays */
+  .tint { position: absolute; inset: 0; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+  .tint.green { box-shadow: inset 0 0 120px rgba(25,255,176,0.55); border: 2px solid var(--green); }
+  .tint.red   { box-shadow: inset 0 0 120px rgba(255,59,84,0.55);  border: 2px solid var(--red);  }
+  .stage.accepted .tint.green { opacity: 1; }
+  .stage.denied   .tint.red   { opacity: 1; animation: pulseRed 1s ease-in-out infinite; }
+  @keyframes pulseRed { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
+
+  /* passcode panel — full-screen lock screen so it fits any phone */
+  .pad {
+    position: fixed; inset: 0; z-index: 100; display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: clamp(12px, 3vh, 20px); padding: 24px;
+    background: rgba(2,8,16,0.96); backdrop-filter: blur(5px);
+  }
+  .stage.locked .pad { display: flex; }
+  .pad h2 {
+    color: var(--red); letter-spacing: 0.15em; text-align: center;
+    line-height: 1.5; font-size: clamp(13px, 4.2vw, 18px);
+    text-shadow: 0 0 14px rgba(255,59,84,0.5);
+  }
+  /* manual passcode entry (not a denial) — cyan header instead of red */
+  .pad h2.neutral { color: var(--cyan); text-shadow: 0 0 14px rgba(45,226,255,0.5); }
+  .dots { display: flex; gap: 14px; }
+  .dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--cyan); }
+  .dot.on { background: var(--cyan); box-shadow: 0 0 12px var(--cyan); }
+  .keys { display: grid; grid-template-columns: repeat(3, clamp(70px, 24vw, 88px)); gap: clamp(8px, 2.5vw, 14px); }
+  .keys button {
+    height: clamp(56px, 15vw, 68px); font-size: clamp(20px, 6vw, 24px); color: var(--text);
+    background: rgba(45,226,255,0.06); border: 1px solid rgba(45,226,255,0.4);
+    border-radius: 10px; cursor: pointer; transition: 0.15s;
+  }
+  .keys button:hover { background: rgba(45,226,255,0.18); box-shadow: 0 0 14px rgba(45,226,255,0.4); }
+  .keys button.wide { grid-column: span 1; font-size: 14px; }
+  .pad .cancel { margin-top: 4px; }
+  .countdown {
+    color: var(--cyan); font-size: 13px; letter-spacing: 0.2em;
+    min-height: 16px; text-shadow: 0 0 10px rgba(45,226,255,0.4);
+  }
+
+  /* controls */
+  .controls { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; justify-content: center; }
+  .btn {
+    background: rgba(45,226,255,0.08); color: var(--cyan);
+    border: 1px solid var(--cyan); border-radius: 8px;
+    padding: 10px 20px; font-size: 13px; letter-spacing: 0.15em;
+    text-transform: uppercase; cursor: pointer; transition: 0.18s;
+  }
+  .btn:hover { background: var(--cyan); color: #02131a; box-shadow: 0 0 18px rgba(45,226,255,0.6); }
+  .btn.ghost { border-color: var(--cyan-dim); color: var(--cyan-dim); }
+
+  /* red, futuristic Lock button — only shown when the door is unlocked */
+  .lock-btn {
+    display: none;
+    background: rgba(255,59,84,0.10); color: var(--red);
+    border: 1px solid var(--red); box-shadow: 0 0 14px rgba(255,59,84,0.35);
+  }
+  .lock-btn:hover { background: var(--red); color: #16000a; box-shadow: 0 0 22px rgba(255,59,84,0.7); }
+  .lock-btn.show { display: inline-block; animation: lockIn 0.4s ease; }
+  @keyframes lockIn { from { opacity: 0; transform: translateY(8px) scale(0.92); } to { opacity: 1; transform: none; } }
+
+  /* door status indicator with lock/unlock icon */
+  .door {
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    margin-top: 22px; padding: 10px 24px; border-radius: 30px;
+    font-size: 16px; letter-spacing: 0.28em; font-weight: 600;
+    border: 1px solid currentColor;
+    transition: color 0.45s ease, box-shadow 0.45s ease, background 0.45s ease;
+  }
+  .door .door-icon { font-size: 22px; transition: transform 0.45s ease; }
+  .door.changing .door-icon { transform: scale(1.45) rotate(-8deg); }
+  .door.locked {
+    color: var(--cyan); background: rgba(45,226,255,0.06);
+    box-shadow: 0 0 18px rgba(45,226,255,0.25);
+  }
+  .door.unlocked {
+    color: var(--green); background: rgba(25,255,176,0.07);
+    box-shadow: 0 0 22px rgba(25,255,176,0.4);
+  }
+
+  .log {
+    width: min(680px, 96vw); margin-top: 16px;
+    font-size: 12px; color: var(--cyan-dim); letter-spacing: 0.08em;
+    min-height: 18px; text-align: center;
+  }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>J.A.R.V.I.S</h1>
+    <p>FACIAL ACCESS CONTROL</p>
+  </header>
+
+  <div class="stage" id="stage">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="overlay"></canvas>
+
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+    <div class="scanline"></div>
+
+    <div class="tint green"></div>
+    <div class="tint red"></div>
+
+    <div class="status" id="status">
+      <b id="statusMain">INITIALIZING</b>
+      <span id="statusSub">starting camera…</span>
+    </div>
+
+    <!-- passcode pad -->
+    <div class="pad" id="pad">
+      <h2 id="padTitle">ACCESS DENIED — ENTER PASSCODE</h2>
+      <div class="countdown" id="countdown"></div>
+      <div class="dots" id="dots">
+        <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      </div>
+      <div class="keys" id="keys"></div>
+      <button class="btn ghost cancel" id="padCancel">Cancel</button>
+    </div>
+  </div>
+
+  <!-- door lock status -->
+  <div class="door locked" id="door">
+    <span class="door-icon" id="doorIcon">&#x1F512;</span>
+    <span class="door-label" id="doorLabel">LOCKED</span>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnReset">Rescan</button>
+    <button class="btn ghost" id="btnPin">&#x2328; Passcode</button>
+    <button class="btn lock-btn" id="btnLock">&#x1F513; Lock Door</button>
+  </div>
+
+  <div class="log" id="log">SYSTEM ONLINE</div>
+
+<script>
+(() => {
+  const API = window.location.origin;       // same IP/port as backend
+  const video   = document.getElementById('video');
+  const overlay = document.getElementById('overlay');
+  const octx    = overlay.getContext('2d');
+  const stage   = document.getElementById('stage');
+  const statusMain = document.getElementById('statusMain');
+  const statusSub  = document.getElementById('statusSub');
+  const logEl   = document.getElementById('log');
+  const padTitle = document.getElementById('padTitle');
+
+  const capture = document.createElement('canvas'); // offscreen frame grabber
+
+  // State machine: idle | scanning | accepted | denied(locked)
+  let state = 'idle';
+  let polling = false;
+  let lastBox = null;
+
+  const log = (m) => { logEl.textContent = m; };
+
+  // ---- door lock state -----------------------------------------------------
+  const doorEl    = document.getElementById('door');
+  const doorIcon  = document.getElementById('doorIcon');
+  const doorLabel = document.getElementById('doorLabel');
+  const btnLock   = document.getElementById('btnLock');
+  let doorStatus  = 'locked';
+
+  function renderDoor() {
+    const locked = doorStatus === 'locked';
+    doorIcon.innerHTML = locked ? '&#x1F512;' : '&#x1F513;';   // 🔒 / 🔓
+    doorLabel.textContent = locked ? 'LOCKED' : 'UNLOCKED';
+    doorEl.classList.toggle('locked', locked);
+    doorEl.classList.toggle('unlocked', !locked);
+    btnLock.classList.toggle('show', !locked);   // Lock button only when unlocked
+    // brief pulse for a smooth status-change feel
+    doorEl.classList.add('changing');
+    setTimeout(() => doorEl.classList.remove('changing'), 450);
+  }
+
+  async function refreshDoor() {
+    try {
+      const r = await fetch(API + '/door');
+      const d = await r.json();
+      doorStatus = d.door_status || 'locked';
+      renderDoor();
+    } catch (e) { /* backend not up yet */ }
+  }
+
+  btnLock.onclick = async () => {
+    if (doorStatus !== 'unlocked') return;   // already locked -> do nothing
+    try {
+      const r = await fetch(API + '/door/lock', { method: 'POST' });
+      const d = await r.json();
+      doorStatus = d.door_status;
+      renderDoor();
+      log('DOOR: ' + (d.door_message || '') + (d.mqtt ? '  | mqtt: ' + d.mqtt : ''));
+      // Locking is what sends the app back to scanning (from ACCESS GRANTED).
+      if (doorStatus === 'locked' && state === 'accepted') rescan();
+    } catch (e) { log('lock error: ' + e.message); }
+  };
+
+  function setStatus(main, sub, color) {
+    statusMain.textContent = main;
+    statusSub.textContent = sub || '';
+    document.getElementById('status').style.color = color || 'var(--cyan)';
+  }
+
+  function setState(s) {
+    state = s;
+    stage.classList.toggle('scanning', s === 'scanning');
+    stage.classList.toggle('accepted', s === 'accepted');
+    stage.classList.toggle('denied',   s === 'denied');
+    // 'pin' = manual passcode entry: shows the pad without the red denied look
+    stage.classList.toggle('locked',   s === 'denied' || s === 'pin');
+    padTitle.textContent = s === 'pin' ? 'ENTER PASSCODE'
+                                       : 'ACCESS DENIED — ENTER PASSCODE';
+    padTitle.classList.toggle('neutral', s === 'pin');
+  }
+
+  // ---- camera --------------------------------------------------------------
+  async function startCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 480, facingMode: 'user' }, audio: false
+      });
+      video.srcObject = stream;
+      await video.play();
+      capture.width = video.videoWidth || 640;
+      capture.height = video.videoHeight || 480;
+      overlay.width = capture.width;
+      overlay.height = capture.height;
+      setState('scanning');
+      setStatus('SCANNING', 'look directly at the camera');
+      log('CAMERA ONLINE — scanning');
+      applyScanningScene();
+      loop();
+    } catch (e) {
+      setStatus('CAMERA ERROR', e.message, 'var(--red)');
+      log('ERROR: ' + e.message);
+    }
+  }
+
+  // Apply the scanning/idle light scene (lights 1-3 off, light 4 effect).
+  async function applyScanningScene() {
+    try { await fetch(API + '/idle', { method: 'POST' }); } catch (e) {}
+  }
+
+  function grabFrame() {
+    const c = capture.getContext('2d');
+    c.drawImage(video, 0, 0, capture.width, capture.height);
+    return capture.toDataURL('image/jpeg', 0.8);
+  }
+
+  // ---- detection box overlay ----------------------------------------------
+  function drawBox(box) {
+    octx.clearRect(0, 0, overlay.width, overlay.height);
+    if (!box) return;
+    // backend coords are on the un-mirrored frame; video is mirrored in CSS,
+    // so mirror the x for the overlay too.
+    const x = overlay.width - box.right;
+    const y = box.top;
+    const w = box.right - box.left;
+    const h = box.bottom - box.top;
+    octx.strokeStyle = state === 'accepted' ? '#19ffb0'
+                     : state === 'denied'   ? '#ff3b54' : '#2de2ff';
+    octx.lineWidth = 2;
+    octx.shadowColor = octx.strokeStyle; octx.shadowBlur = 12;
+    octx.strokeRect(x, y, w, h);
+    octx.shadowBlur = 0;
+  }
+
+  // ---- main poll loop ------------------------------------------------------
+  async function loop() {
+    if (state !== 'scanning') return;          // pause when accepted/locked
+    if (polling) { requestAnimationFrame(loop); return; }
+    polling = true;
+    try {
+      const res = await fetch(API + '/recognize', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: grabFrame() })
+      });
+      const data = await res.json();
+      handleResult(data);
+    } catch (e) {
+      log('link lost: ' + e.message);
+    } finally {
+      polling = false;
+    }
+    if (state === 'scanning') setTimeout(loop, 600);  // ~1.6 fps poll
+  }
+
+  function handleResult(d) {
+    lastBox = d.box || null;
+    drawBox(lastBox);
+
+    if (d.status === 'accepted') {
+      if (d.door_status) { doorStatus = d.door_status; renderDoor(); }
+      setState('accepted');
+      const sub = d.door_message ? d.door_message
+                : d.name ? ('welcome, ' + d.name) : '';
+      setStatus('ACCESS GRANTED', sub, 'var(--green)');
+      log('ACCEPTED — ' + (d.name || '')
+          + (d.door_message ? '  | ' + d.door_message : '')
+          + (d.mqtt ? '  | mqtt: ' + d.mqtt : ''));
+      return;   // stays on ACCESS GRANTED until the door is locked again
+    }
+    if (d.status === 'denied') {
+      setState('denied');
+      resetPad();
+      startLockCountdown(15);
+      setStatus('ACCESS DENIED', 'unknown face — enter passcode', 'var(--red)');
+      log('DENIED — unknown face');
+      return;
+    }
+    // no_face (incl. "not looking")
+    if (d.eye_contact === false && d.box) {
+      setStatus('FACE DETECTED', 'look directly at the camera');
+    } else {
+      setStatus('SCANNING', 'present your face');
+    }
+  }
+
+  // ---- passcode pad --------------------------------------------------------
+  const keysEl = document.getElementById('keys');
+  const dotsEl = document.getElementById('dots').children;
+  const countdownEl = document.getElementById('countdown');
+  let entry = '';
+  let lockTimer = null;
+
+  // 15s auto-rescan: if no correct passcode is entered, return to face scanning.
+  function startLockCountdown(seconds = 15) {
+    clearLockCountdown();
+    let remaining = seconds;
+    countdownEl.textContent = 'AUTO-RESCAN IN ' + remaining + 's';
+    lockTimer = setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) { clearLockCountdown(); rescan(); return; }
+      countdownEl.textContent = 'AUTO-RESCAN IN ' + remaining + 's';
+    }, 1000);
+  }
+  function clearLockCountdown() {
+    if (lockTimer) { clearInterval(lockTimer); lockTimer = null; }
+    countdownEl.textContent = '';
+  }
+
+  function resetPad() { entry = ''; renderDots(); }
+  function renderDots() {
+    [...dotsEl].forEach((d, i) => d.classList.toggle('on', i < entry.length));
+  }
+  function buildKeys() {
+    const layout = ['1','2','3','4','5','6','7','8','9','del','0','ok'];
+    layout.forEach(k => {
+      const b = document.createElement('button');
+      if (k === 'del') { b.textContent = '⌫'; b.className = 'wide'; }
+      else if (k === 'ok') { b.textContent = 'OK'; b.className = 'wide'; }
+      else b.textContent = k;
+      b.onclick = () => pressKey(k);
+      keysEl.appendChild(b);
+    });
+  }
+  function pressKey(k) {
+    if (k === 'del') { entry = entry.slice(0, -1); renderDots(); return; }
+    if (k === 'ok')  { submitPasscode(); return; }
+    if (entry.length < 4) { entry += k; renderDots(); }
+    if (entry.length === 4) submitPasscode();
+  }
+  async function submitPasscode() {
+    if (entry.length !== 4) return;
+    log('verifying passcode…');
+    try {
+      const res = await fetch(API + '/passcode', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passcode: entry })
+      });
+      const d = await res.json();
+      if (d.status === 'accepted') {
+        clearLockCountdown();
+        if (d.door_status) { doorStatus = d.door_status; renderDoor(); }
+        setState('accepted');
+        setStatus('ACCESS GRANTED', d.door_message || 'passcode accepted', 'var(--green)');
+        log('PASSCODE OK' + (d.door_message ? '  | ' + d.door_message : '') + (d.mqtt ? '  | mqtt: ' + d.mqtt : ''));
+      } else {
+        setStatus('ACCESS DENIED', 'incorrect passcode', 'var(--red)');
+        log('PASSCODE WRONG' + (d.ha ? '  | HA: ' + d.ha : ''));
+        resetPad();
+        startLockCountdown(15);   // fresh 15s after a wrong attempt
+      }
+    } catch (e) { log('error: ' + e.message); }
+  }
+
+  // keyboard support for passcode (denied pad or manual entry)
+  window.addEventListener('keydown', (e) => {
+    if (state !== 'denied' && state !== 'pin') return;
+    if (/^[0-9]$/.test(e.key)) pressKey(e.key);
+    else if (e.key === 'Backspace') pressKey('del');
+    else if (e.key === 'Enter') pressKey('ok');
+  });
+
+  // ---- controls ------------------------------------------------------------
+  function rescan() {
+    clearLockCountdown();
+    resetPad();
+    octx.clearRect(0, 0, overlay.width, overlay.height);
+    setState('scanning');
+    setStatus('SCANNING', 'look directly at the camera');
+    log('rescanning…');
+    applyScanningScene();
+    loop();
+  }
+  document.getElementById('btnReset').onclick = rescan;
+  document.getElementById('padCancel').onclick = rescan;
+
+  // Manual passcode entry — jump straight to the keypad (neutral, not "denied").
+  document.getElementById('btnPin').onclick = () => {
+    if (state === 'denied' || state === 'pin') return;
+    resetPad();
+    setState('pin');
+    startLockCountdown(15);          // same 15s auto-return as the denied pad
+    setStatus('PASSCODE ENTRY', 'enter your code', 'var(--cyan)');
+    log('manual passcode entry');
+  };
+
+  // ---- boot ----------------------------------------------------------------
+  buildKeys();
+  renderDoor();
+  refreshDoor();
+  startCamera();
+})();
+</script>
+</body>
+</html>

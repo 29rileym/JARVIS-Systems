@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>J.A.R.V.I.S.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cyan: #16e0ff;
+    --cyan-dim: #0d8ba3;
+    --cyan-glow: rgba(22, 224, 255, 0.55);
+    --blue: #2979ff;
+    --bg: #030810;
+    --panel: rgba(10, 25, 40, 0.55);
+    --panel-border: rgba(22, 224, 255, 0.22);
+    --text-dim: #5f8ea6;
+    --amber: #ffb340;
+    --red: #ff4d5e;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: var(--bg);
+    color: var(--cyan);
+    font-family: 'Orbitron', sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+    display: flex;
+    flex-direction: column;
+  }
+  /* ambient background */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 42%, rgba(22,140,255,0.10), transparent 65%),
+      repeating-linear-gradient(0deg, transparent 0 39px, rgba(22,224,255,0.035) 39px 40px),
+      repeating-linear-gradient(90deg, transparent 0 39px, rgba(22,224,255,0.035) 39px 40px);
+    pointer-events: none;
+  }
+  body::after { /* scanline sweep */
+    content: '';
+    position: fixed; left: 0; right: 0; height: 140px; z-index: 0;
+    background: linear-gradient(180deg, transparent, rgba(22,224,255,0.045), transparent);
+    animation: sweep 9s linear infinite;
+    pointer-events: none;
+  }
+  @keyframes sweep { from { top: -20%; } to { top: 110%; } }
+
+  /* ---------- header ---------- */
+  header {
+    position: relative; z-index: 2;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 28px 8px;
+  }
+  .wordmark { display: flex; flex-direction: column; }
+  .wordmark h1 {
+    font-weight: 900; font-size: clamp(22px, 3.2vw, 34px); letter-spacing: 0.42em;
+    color: #dff7ff;
+    text-shadow: 0 0 18px var(--cyan-glow), 0 0 40px rgba(22,224,255,0.25);
+  }
+  .wordmark span {
+    font-size: 10px; letter-spacing: 0.36em; color: var(--text-dim); margin-top: 4px;
+  }
+  .clock { text-align: right; }
+  .clock #clock-time {
+    font-size: clamp(20px, 3vw, 30px); font-weight: 700; letter-spacing: 0.12em;
+    text-shadow: 0 0 14px var(--cyan-glow);
+  }
+  .clock #clock-date { font-size: 10px; letter-spacing: 0.3em; color: var(--text-dim); margin-top: 3px; }
+
+  /* ---------- stage / reactor ---------- */
+  main { position: relative; z-index: 1; flex: 1; display: flex; align-items: center; justify-content: center; }
+  #reactor-wrap {
+    position: relative;
+    width: min(52vmin, 420px); height: min(52vmin, 420px);
+    cursor: pointer;
+    transition: filter 0.5s ease;
+  }
+  #reactor { width: 100%; height: 100%; display: block; }
+  .ring { transform-origin: 200px 200px; }
+  .spin-slow   { animation: rot 24s linear infinite; }
+  .spin-med    { animation: rot-rev 14s linear infinite; }
+  .spin-fast   { animation: rot 8s linear infinite; }
+  @keyframes rot     { to { transform: rotate(360deg); } }
+  @keyframes rot-rev { to { transform: rotate(-360deg); } }
+
+  #core-glow {
+    position: absolute; inset: 31%; border-radius: 50%;
+    background: radial-gradient(circle, rgba(210,250,255,0.95) 0%, rgba(22,224,255,0.55) 42%, rgba(22,140,255,0.12) 72%, transparent 100%);
+    filter: blur(1px);
+    animation: breathe 4s ease-in-out infinite;
+    transition: all 0.45s ease;
+  }
+  @keyframes breathe { 0%,100% { transform: scale(1); opacity: .82; } 50% { transform: scale(1.07); opacity: 1; } }
+
+  /* state theming via body class */
+  body.listening #core-glow { animation: breathe 0.9s ease-in-out infinite; inset: 27%; }
+  body.listening #reactor-wrap { filter: drop-shadow(0 0 46px var(--cyan-glow)); }
+  body.listening .spin-fast { animation-duration: 2.5s; }
+  body.processing #core-glow {
+    background: radial-gradient(circle, #fff6e6 0%, rgba(255,179,64,0.5) 45%, transparent 100%);
+    animation: breathe 0.5s ease-in-out infinite;
+  }
+  body.processing .spin-slow { animation-duration: 4s; }
+  body.processing .spin-med { animation-duration: 2s; }
+  body.speaking #core-glow { animation: talk 0.34s ease-in-out infinite; }
+  @keyframes talk { 0%,100% { transform: scale(0.94); } 50% { transform: scale(1.12); } }
+
+  #status-label {
+    position: absolute; left: 50%; bottom: -52px; transform: translateX(-50%);
+    font-size: clamp(13px, 1.8vw, 17px); font-weight: 700; letter-spacing: 0.5em; padding-left: 0.5em;
+    color: #bdefff; text-shadow: 0 0 12px var(--cyan-glow);
+    white-space: nowrap;
+  }
+  #status-hint {
+    position: absolute; left: 50%; bottom: -76px; transform: translateX(-50%);
+    font-size: 10px; letter-spacing: 0.25em; color: var(--text-dim); white-space: nowrap;
+  }
+  body.listening #status-label { color: var(--cyan); animation: blink 1.1s ease-in-out infinite; }
+  body.processing #status-label { color: var(--amber); text-shadow: 0 0 12px rgba(255,179,64,.6); }
+  @keyframes blink { 50% { opacity: 0.45; } }
+
+  /* ---------- console panel ---------- */
+  footer { position: relative; z-index: 2; padding: 0 28px 22px; }
+  #console {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 14px 20px;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 0 24px rgba(22,224,255,0.06), inset 0 0 30px rgba(22,224,255,0.03);
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px 32px;
+    min-height: 84px;
+  }
+  #console .lbl {
+    font-size: 9px; letter-spacing: 0.32em; color: var(--text-dim);
+  }
+  #console .val {
+    font-family: 'Share Tech Mono', monospace; font-size: clamp(13px, 1.9vw, 16px);
+    color: #d8f6ff; line-height: 1.45; min-height: 1.4em;
+    overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  }
+  #last-response { color: var(--cyan) !important; text-shadow: 0 0 8px rgba(22,224,255,0.35); }
+
+  /* ---------- timer widget ---------- */
+  #timer-widget {
+    position: absolute; right: 28px; top: 50%; transform: translateY(-50%) scale(0.8);
+    z-index: 3; opacity: 0; pointer-events: none;
+    width: 148px; text-align: center;
+    background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px;
+    padding: 16px 12px 14px;
+    backdrop-filter: blur(6px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+  }
+  #timer-widget.show { opacity: 1; transform: translateY(-50%) scale(1); pointer-events: auto; }
+  #timer-widget .lbl { font-size: 9px; letter-spacing: 0.32em; color: var(--text-dim); }
+  #timer-ring { width: 110px; height: 110px; margin: 10px auto 8px; transform: rotate(-90deg); }
+  #timer-ring .track { stroke: rgba(22,224,255,0.14); }
+  #timer-ring .fill { stroke: var(--cyan); stroke-linecap: round; filter: drop-shadow(0 0 5px var(--cyan-glow)); transition: stroke-dashoffset 1s linear; }
+  #timer-count {
+    font-size: 21px; font-weight: 700; letter-spacing: 0.08em;
+    text-shadow: 0 0 12px var(--cyan-glow);
+  }
+  #timer-widget.done #timer-count { color: var(--red); animation: blink 0.5s infinite; }
+
+  /* ---------- boot overlay ---------- */
+  #boot {
+    position: fixed; inset: 0; z-index: 50;
+    background: radial-gradient(circle at 50% 45%, #06121f, var(--bg) 75%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px;
+    transition: opacity 0.7s ease;
+  }
+  #boot.hide { opacity: 0; pointer-events: none; }
+  #boot h1 { font-weight: 900; letter-spacing: 0.5em; padding-left:.5em; font-size: clamp(26px, 5vw, 44px); color: #dff7ff; text-shadow: 0 0 26px var(--cyan-glow); }
+  #boot button {
+    font-family: 'Orbitron', sans-serif; font-weight: 700; letter-spacing: 0.3em; padding-left:.3em;
+    font-size: 15px; color: var(--cyan);
+    background: rgba(22,224,255,0.06); border: 1px solid var(--cyan-dim); border-radius: 8px;
+    padding: 16px 42px; cursor: pointer;
+    box-shadow: 0 0 22px rgba(22,224,255,0.15), inset 0 0 14px rgba(22,224,255,0.06);
+    animation: breathe 2.4s ease-in-out infinite;
+  }
+  #boot input {
+    font-family: 'Share Tech Mono', monospace; font-size: 18px; letter-spacing: 0.4em; text-align: center;
+    color: var(--cyan); background: rgba(22,224,255,0.05);
+    border: 1px solid var(--panel-border); border-radius: 8px; padding: 12px 16px; width: 230px; outline: none;
+  }
+  #boot .note { font-size: 10px; letter-spacing: 0.2em; color: var(--text-dim); max-width: 460px; text-align: center; line-height: 2; }
+  .hidden { display: none !important; }
+
+  /* ---------- sleep mode overlay (tap anywhere to wake) ----------
+     Kept deliberately dumb: a display-toggled solid block, no opacity or
+     transition tricks, z-index above everything. */
+  #sleep-overlay {
+    display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    width: 100vw; height: 100vh; z-index: 9999; background: #000; cursor: pointer;
+  }
+  body.asleep #sleep-overlay { display: block; }
+
+  /* build tag: visible marker to distinguish fresh page from a cached copy */
+  #build-tag {
+    position: fixed; right: 8px; bottom: 6px; z-index: 5;
+    font-size: 9px; letter-spacing: 0.2em; color: var(--text-dim); opacity: 0.6;
+  }
+
+  @media (max-width: 700px) {
+    #console { grid-template-columns: 1fr; }
+    #timer-widget { right: 12px; width: 120px; }
+    #timer-ring { width: 88px; height: 88px; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- boot / activation overlay (needed: mic + AudioContext require a tap) -->
+  <div id="boot">
+    <h1>J.A.R.V.I.S.</h1>
+    <input id="passcode-input" class="hidden" type="password" inputmode="numeric" placeholder="PASSCODE">
+    <button id="boot-btn">INITIALIZE</button>
+    <div class="note" id="boot-note">TAP TO GRANT MICROPHONE ACCESS AND BRING SYSTEMS ONLINE</div>
+  </div>
+
+  <!-- sleep mode: solid black, sits above everything; tap wakes the screen -->
+  <div id="sleep-overlay"></div>
+  <div id="build-tag">V2 · SLEEP</div>
+
+  <header>
+    <div class="wordmark">
+      <h1>J.A.R.V.I.S.</h1>
+      <span>JUST A RATHER VERY INTELLIGENT SYSTEM</span>
+    </div>
+    <div class="clock">
+      <div id="clock-time">--:--</div>
+      <div id="clock-date">&nbsp;</div>
+    </div>
+  </header>
+
+  <main>
+    <div id="reactor-wrap" title="Tap to talk">
+      <svg id="reactor" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="coreGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#eaffff" stop-opacity="0.9"/>
+            <stop offset="55%" stop-color="#16e0ff" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="#16e0ff" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <!-- outer tick ring -->
+        <g class="ring spin-slow">
+          <circle cx="200" cy="200" r="188" fill="none" stroke="#0d3b52" stroke-width="2"/>
+          <circle cx="200" cy="200" r="182" fill="none" stroke="#16e0ff" stroke-width="3"
+                  stroke-dasharray="4 26" opacity="0.7"/>
+        </g>
+        <!-- segmented arc ring -->
+        <g class="ring spin-med">
+          <circle cx="200" cy="200" r="158" fill="none" stroke="#16e0ff" stroke-width="7"
+                  stroke-dasharray="70 30 20 30 110 30" opacity="0.35"/>
+          <circle cx="200" cy="200" r="146" fill="none" stroke="#2979ff" stroke-width="2"
+                  stroke-dasharray="2 10" opacity="0.8"/>
+        </g>
+        <!-- inner triple arcs -->
+        <g class="ring spin-fast">
+          <circle cx="200" cy="200" r="120" fill="none" stroke="#16e0ff" stroke-width="4"
+                  stroke-dasharray="188 63" opacity="0.85"/>
+          <circle cx="200" cy="200" r="108" fill="none" stroke="#16e0ff" stroke-width="2"
+                  stroke-dasharray="56 113" opacity="0.5"/>
+        </g>
+        <!-- reactor coils -->
+        <g opacity="0.9">
+          <g id="coils"></g>
+        </g>
+        <circle cx="200" cy="200" r="66" fill="url(#coreGrad)"/>
+        <circle cx="200" cy="200" r="58" fill="none" stroke="#9feeff" stroke-width="1.5" opacity="0.9"/>
+        <circle cx="200" cy="200" r="40" fill="none" stroke="#16e0ff" stroke-width="2" opacity="0.6"/>
+      </svg>
+      <div id="core-glow"></div>
+      <div id="status-label">IDLE</div>
+      <div id="status-hint">SAY “JARVIS” OR TAP THE CORE</div>
+    </div>
+
+    <!-- timer -->
+    <div id="timer-widget">
+      <div class="lbl">TIMER</div>
+      <svg id="timer-ring" viewBox="0 0 100 100">
+        <circle class="track" cx="50" cy="50" r="44" fill="none" stroke-width="5"/>
+        <circle class="fill" id="timer-fill" cx="50" cy="50" r="44" fill="none" stroke-width="5"
+                stroke-dasharray="276.46" stroke-dashoffset="0"/>
+      </svg>
+      <div id="timer-count">00:00</div>
+    </div>
+  </main>
+
+  <footer>
+    <div id="console">
+      <div>
+        <div class="lbl">LAST COMMAND</div>
+        <div class="val" id="last-command">—</div>
+      </div>
+      <div>
+        <div class="lbl">JARVIS</div>
+        <div class="val" id="last-response">Standing by, sir.</div>
+      </div>
+    </div>
+  </footer>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ============================== state ============================== */
+  const S = { IDLE: 'IDLE', LISTENING: 'LISTENING', PROCESSING: 'PROCESSING', SPEAKING: 'SPEAKING' };
+  let state = S.IDLE;
+  let wakeWord = 'jarvis';
+  let passcode = localStorage.getItem('jarvis_passcode') || '';
+  let listenTimeout = null;
+
+  const $ = id => document.getElementById(id);
+  const statusLabel = $('status-label'), statusHint = $('status-hint');
+
+  function setState(next) {
+    state = next;
+    document.body.className = next.toLowerCase();
+    statusLabel.textContent = next;
+    statusHint.textContent = {
+      IDLE: 'SAY “' + wakeWord.toUpperCase() + '” OR TAP THE CORE',
+      LISTENING: 'AWAITING YOUR COMMAND, SIR',
+      PROCESSING: 'ANALYSING',
+      SPEAKING: 'RESPONDING',
+    }[next];
+  }
+
+  /* ============================== clock ============================== */
+  function tickClock() {
+    const now = new Date();
+    $('clock-time').textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    $('clock-date').textContent = now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }).toUpperCase();
+  }
+  setInterval(tickClock, 1000); tickClock();
+
+  /* ==================== reactor coil decoration ==================== */
+  (function drawCoils() {
+    const g = $('coils');
+    let html = '';
+    for (let i = 0; i < 10; i++) {
+      const a = i * 36;
+      html += `<rect x="192" y="118" width="16" height="26" rx="3" fill="none" stroke="#16e0ff"
+               stroke-width="2" opacity="0.55" transform="rotate(${a} 200 200)"/>`;
+    }
+    g.innerHTML = html;
+  })();
+
+  /* ======================= rolling audio buffer ======================= */
+  // Continuously captures mic PCM so that when a command ends we can slice
+  // the exact audio (from wake-word onward) and ship it to Gemini.
+  let audioCtx = null, micStream = null, captureRate = 48000;
+  let chunks = [];           // {data: Float32Array, start: absolute sample index}
+  let totalSamples = 0;
+  let wakeMark = null;       // absolute sample index where the command started
+  const BUFFER_SECONDS = 14;
+
+  async function startAudio() {
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+    });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    captureRate = audioCtx.sampleRate;
+    const src = audioCtx.createMediaStreamSource(micStream);
+    const proc = audioCtx.createScriptProcessor(4096, 1, 1);
+    proc.onaudioprocess = e => {
+      const data = new Float32Array(e.inputBuffer.getChannelData(0));
+      chunks.push({ data, start: totalSamples });
+      totalSamples += data.length;
+      const minStart = totalSamples - BUFFER_SECONDS * captureRate;
+      while (chunks.length && chunks[0].start + chunks[0].data.length < minStart) chunks.shift();
+    };
+    src.connect(proc);
+    proc.connect(audioCtx.destination); // required by some browsers to keep it running
+  }
+
+  function sliceAudioFrom(mark) {
+    const parts = [];
+    let len = 0;
+    for (const c of chunks) {
+      const end = c.start + c.data.length;
+      if (end <= mark) continue;
+      const from = Math.max(0, mark - c.start);
+      const piece = c.data.subarray(from);
+      parts.push(piece); len += piece.length;
+    }
+    const out = new Float32Array(len);
+    let o = 0;
+    for (const p of parts) { out.set(p, o); o += p.length; }
+    return out;
+  }
+
+  function downsampleTo16k(input) {
+    const ratio = captureRate / 16000;
+    const outLen = Math.floor(input.length / ratio);
+    const out = new Int16Array(outLen);
+    for (let i = 0; i < outLen; i++) {
+      const idx = i * ratio, lo = Math.floor(idx), hi = Math.min(lo + 1, input.length - 1);
+      const s = input[lo] + (input[hi] - input[lo]) * (idx - lo);
+      out[i] = Math.max(-1, Math.min(1, s)) * 0x7FFF;
+    }
+    return out;
+  }
+
+  function pcm16ToBase64(int16) {
+    const bytes = new Uint8Array(int16.buffer);
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000)
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+
+  /* ===================== wake word / recognition ===================== */
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let rec = null, recActive = false;
+
+  function startRecognition() {
+    if (!SR) {
+      statusHint.textContent = 'NO SPEECH RECOGNITION — TAP THE CORE TO TALK';
+      return;
+    }
+    rec = new SR();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = 'en-US';
+
+    rec.onresult = e => {
+      if (state === S.PROCESSING || state === S.SPEAKING) return; // ignore our own voice
+      let interim = '', finals = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const txt = e.results[i][0].transcript;
+        if (e.results[i].isFinal) finals += txt + ' ';
+        else interim += txt + ' ';
+      }
+      const finalLow = finals.trim().toLowerCase();
+      const interimLow = interim.trim().toLowerCase();
+
+      if (state === S.IDLE) {
+        // wake word appears mid-speech → arm listening immediately
+        if (interimLow.includes(wakeWord) || finalLow.includes(wakeWord)) {
+          if (wakeMark === null) wakeMark = Math.max(0, totalSamples - captureRate * 1.5);
+          setState(S.LISTENING);
+          armListenTimeout();
+        }
+        // "jarvis <command>" in a single final utterance
+        if (finalLow.includes(wakeWord)) {
+          const after = finalLow.split(wakeWord).pop().replace(/^[\s,.:;!?]+/, '').trim();
+          if (after.split(/\s+/).filter(Boolean).length >= 2) {
+            sendCommand(after);
+          } else {
+            setState(S.LISTENING);
+            armListenTimeout();
+          }
+        }
+      } else if (state === S.LISTENING && finalLow) {
+        const cmd = finalLow.includes(wakeWord)
+          ? finalLow.split(wakeWord).pop().replace(/^[\s,.:;!?]+/, '').trim() || finalLow
+          : finalLow;
+        sendCommand(cmd);
+      }
+    };
+    rec.onend = () => { if (recActive) { try { rec.start(); } catch (_) {} } };
+    rec.onerror = ev => { if (ev.error === 'not-allowed') recActive = false; };
+    recActive = true;
+    try { rec.start(); } catch (_) {}
+  }
+
+  function armListenTimeout() {
+    clearTimeout(listenTimeout);
+    listenTimeout = setTimeout(() => {
+      if (state === S.LISTENING) { wakeMark = null; setState(S.IDLE); }
+    }, 9000);
+  }
+
+  /* ========================= command pipeline ========================= */
+  async function sendCommand(transcript, forceAudio) {
+    clearTimeout(listenTimeout);
+    setState(S.PROCESSING);
+    $('last-command').textContent = transcript || '(voice)';
+
+    let audio_b64 = null;
+    const mark = wakeMark !== null ? wakeMark : totalSamples - captureRate * 6;
+    wakeMark = null;
+    // When we have a transcript, send text only: on iOS the speech recognizer
+    // and WebAudio recorder fight over the mic, so the recorded buffer is
+    // unreliable (sometimes speech, sometimes silence). Text keeps Layer 2
+    // deterministic; raw audio is used for tap-to-talk where there is no
+    // transcript.
+    if (!transcript || forceAudio) {
+      try {
+        const f32 = forceAudio || sliceAudioFrom(Math.max(0, mark));
+        let rms = 0;
+        for (let i = 0; i < f32.length; i++) rms += f32[i] * f32[i];
+        rms = f32.length ? Math.sqrt(rms / f32.length) : 0;
+        if (f32.length > captureRate * 0.3 && rms > 0.004) {
+          audio_b64 = pcm16ToBase64(downsampleTo16k(f32));
+        }
+      } catch (err) { console.warn('audio slice failed', err); }
+    }
+
+    try {
+      const r = await fetch('/api/command', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Passcode': passcode },
+        body: JSON.stringify({ transcript: transcript || '', audio_b64, sample_rate: 16000 }),
+      });
+      if (r.status === 401) { localStorage.removeItem('jarvis_passcode'); location.reload(); return; }
+      const res = await r.json();
+
+      $('last-response').textContent = res.text || '…';
+      if (res.action === 'timer' && res.timer_seconds) startTimer(res.timer_seconds);
+      if (res.action === 'timer_cancel') stopTimer();
+      if (res.action === 'sleep') {
+        document.body.classList.add('asleep');
+        $('sleep-overlay').style.display = 'block';   // belt-and-braces with the CSS class
+      }
+
+      if (res.audio_b64) playResponse(res.audio_b64);
+      else setState(S.IDLE);
+    } catch (err) {
+      console.error(err);
+      $('last-response').textContent = 'Backend unreachable, sir.';
+      setState(S.IDLE);
+    }
+  }
+
+  async function playResponse(b64) {
+    // Play through the AudioContext unlocked by the INITIALIZE tap —
+    // iOS blocks `new Audio().play()` outside a direct user gesture.
+    setState(S.SPEAKING);
+    try {
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      if (audioCtx.state === 'suspended') await audioCtx.resume();
+      const buf = await audioCtx.decodeAudioData(bytes.buffer);
+      const src = audioCtx.createBufferSource();
+      src.buffer = buf;
+      src.connect(audioCtx.destination);
+      src.onended = () => setState(S.IDLE);
+      src.start();
+    } catch (err) {
+      console.error('playback failed', err);
+      setState(S.IDLE);
+    }
+  }
+
+  /* ===================== sleep mode wake ===================== */
+  // Tap anywhere on the black overlay to wake. stopPropagation so the same
+  // tap can't fall through and start a tap-to-talk recording.
+  $('sleep-overlay').addEventListener('click', e => {
+    e.stopPropagation();
+    document.body.classList.remove('asleep');
+    $('sleep-overlay').style.display = 'none';
+  });
+
+  /* ===================== tap-to-talk (fallback) ===================== */
+  let manualRecording = false, manualStart = 0;
+  $('reactor-wrap').addEventListener('click', () => {
+    if (state === S.PROCESSING || state === S.SPEAKING) return;
+    if (!manualRecording) {
+      manualRecording = true;
+      manualStart = totalSamples;
+      wakeMark = totalSamples;
+      setState(S.LISTENING);
+      statusHint.textContent = 'RECORDING — TAP AGAIN TO SEND';
+      clearTimeout(listenTimeout);
+      listenTimeout = setTimeout(() => { if (manualRecording) finishManual(); }, 10000);
+    } else {
+      finishManual();
+    }
+  });
+  function finishManual() {
+    manualRecording = false;
+    clearTimeout(listenTimeout);
+    const f32 = sliceAudioFrom(manualStart);
+    if (f32.length < captureRate * 0.4) { setState(S.IDLE); return; }
+    sendCommand('', f32);
+  }
+
+  /* ============================== timer ============================== */
+  const CIRC = 276.46;
+  let timer = null;
+  function startTimer(seconds) {
+    stopTimer();
+    const widget = $('timer-widget'), fill = $('timer-fill'), count = $('timer-count');
+    widget.classList.remove('done');
+    widget.classList.add('show');
+    const endAt = Date.now() + seconds * 1000;
+    const render = () => {
+      const left = Math.max(0, Math.round((endAt - Date.now()) / 1000));
+      const m = String(Math.floor(left / 60)).padStart(2, '0');
+      const s = String(left % 60).padStart(2, '0');
+      count.textContent = `${m}:${s}`;
+      fill.style.strokeDashoffset = CIRC * (1 - left / seconds);
+      if (left <= 0) timerDone();
+    };
+    render();
+    timer = setInterval(render, 1000);
+  }
+  function stopTimer() {
+    clearInterval(timer); timer = null;
+    $('timer-widget').classList.remove('show', 'done');
+  }
+  async function timerDone() {
+    clearInterval(timer); timer = null;
+    $('timer-widget').classList.add('done');
+    chime();
+    try {
+      const r = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Passcode': passcode },
+        body: JSON.stringify({ text: 'Sir, your timer is up.' }),
+      });
+      const res = await r.json();
+      $('last-response').textContent = res.text;
+      if (res.audio_b64) playResponse(res.audio_b64);
+    } catch (_) {}
+    setTimeout(stopTimer, 12000);
+  }
+  function chime() {
+    if (!audioCtx) return;
+    const t0 = audioCtx.currentTime;
+    [880, 1174.7, 880].forEach((f, i) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.frequency.value = f; o.type = 'sine';
+      g.gain.setValueAtTime(0.0001, t0 + i * 0.28);
+      g.gain.exponentialRampToValueAtTime(0.22, t0 + i * 0.28 + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + i * 0.28 + 0.25);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(t0 + i * 0.28); o.stop(t0 + i * 0.28 + 0.3);
+    });
+  }
+
+  /* ============================== boot ============================== */
+  let needPasscode = false;
+  fetch('/api/status').then(r => r.json()).then(st => {
+    wakeWord = (st.wake_word || 'jarvis').toLowerCase();
+    needPasscode = st.passcode_required && !passcode;
+    if (needPasscode) $('passcode-input').classList.remove('hidden');
+  }).catch(() => {});
+
+  $('boot-btn').addEventListener('click', async () => {
+    if (needPasscode) {
+      passcode = $('passcode-input').value.trim();
+      if (!passcode) { $('passcode-input').focus(); return; }
+      localStorage.setItem('jarvis_passcode', passcode);
+    }
+    $('boot-btn').textContent = 'CALIBRATING…';
+    try {
+      await startAudio();
+      startRecognition();
+      $('boot').classList.add('hide');
+      setState(S.IDLE);
+    } catch (err) {
+      console.error(err);
+      $('boot-btn').textContent = 'RETRY';
+      $('boot-note').textContent =
+        'MICROPHONE ACCESS FAILED — USE HTTPS OR LOCALHOST, THEN CHECK BROWSER PERMISSIONS';
+    }
+  });
+})();
+</script>
+</body>
+</html>

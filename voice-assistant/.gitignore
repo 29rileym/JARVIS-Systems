@@ -1,0 +1,25 @@
+# ---------------------------------------------------------------------------
+# SECRETS — never commit. config.json holds the Gemini API key, the Home
+# Assistant long-lived token, and the VoiceMonkey webhook token.
+# Copy config.example.json -> config.json on a new machine and fill it in.
+# ---------------------------------------------------------------------------
+config.json
+
+# TLS keypair — key.pem is a private key. Both regenerate with gen_cert.py.
+*.pem
+
+# Python environment and bytecode
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Generated at runtime (recreated automatically, ~4.7 MB of cached speech)
+tts_cache/
+
+# Editor / OS noise
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

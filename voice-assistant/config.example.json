@@ -1,0 +1,46 @@
+{
+  "passcode": "",
+  "wake_word": "jarvis",
+  "sleep_webhook": "https://api-v2.voicemonkey.io/trigger?token=YOUR_VOICEMONKEY_TOKEN&device=your-device-name",
+
+  "gemini": {
+    "api_key": "YOUR_GEMINI_API_KEY",
+    "live_model": "gemini-2.5-flash-native-audio-preview-09-2025",
+    "tts_model": "gemini-2.5-flash-preview-tts",
+    "voice": "Charon"
+  },
+
+  "home_assistant": {
+    "url": "http://192.168.1.50:8123",
+    "token": "YOUR_HOME_ASSISTANT_LONG_LIVED_TOKEN",
+    "lights": {
+      "cloud lights": "light.cloud_lights",
+      "rope lights": "light.neon_rope_lights",
+      "main lights": ["light.smart_led_bulb_1", "light.smart_led_bulb_2", "light.smart_led_bulb_3"],
+      "entrance light": "light.smart_led_bulb_4",
+      "tv backlight": "light.tv_backlight_3_lite"
+    }
+  },
+
+  "tesla": {
+    "enabled": false,
+    "lock": "lock.my_car_lock",
+    "climate": "climate.my_car_climate",
+    "battery_sensor": "sensor.my_car_battery_level",
+    "range_sensor": "sensor.my_car_battery_range",
+    "charging_sensor": "sensor.my_car_charging",
+    "charge_switch": "switch.my_car_charge",
+    "frunk": "cover.my_car_frunk",
+    "trunk": "cover.my_car_trunk",
+    "sentry_switch": "switch.my_car_sentry_mode",
+    "fart_button": "button.my_car_play_fart"
+  },
+
+  "mqtt": {
+    "broker": "192.168.1.50",
+    "port": 1883,
+    "topic": "jarvis/door",
+    "username": "",
+    "password": ""
+  }
+}

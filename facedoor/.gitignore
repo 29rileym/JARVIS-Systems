@@ -1,0 +1,29 @@
+# ---------------------------------------------------------------------------
+# SECRETS — never commit. config.json holds the Home Assistant long-lived
+# token and the door passcode.
+# Copy config.example.json -> config.json on a new machine and fill it in.
+# ---------------------------------------------------------------------------
+config.json
+
+# ---------------------------------------------------------------------------
+# BIOMETRIC DATA — never commit. faces/ holds enrollment photos and the 128-d
+# face encodings that open a real door. Re-enroll on a new machine with:
+#   python register_face.py "Name" /path/to/photo.jpg
+# ---------------------------------------------------------------------------
+faces/
+
+# TLS keypair — key.pem is a private key. Both auto-regenerate on startup.
+*.pem
+
+# Python environment and bytecode
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+
+# Editor / OS noise
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
